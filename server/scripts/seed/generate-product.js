@@ -6,16 +6,28 @@ const hashSeed = (seed) => {
   return digest.readUInt32LE(0);
 };
 
-const random = (seed, index, salt) => {
-  let value = (hashSeed(seed) + index * 1664525 + salt * 1013904223) >>> 0;
+const seedHashes = new Map();
+
+const seedHash = (seed) => {
+  let hash = seedHashes.get(seed);
+  if (hash === undefined) {
+    hash = hashSeed(seed);
+    seedHashes.set(seed, hash);
+  }
+  return hash;
+};
+
+const random = (seedHashValue, index, salt) => {
+  let value =
+    (seedHashValue + index * 1664525 + salt * 1013904223) >>> 0;
   value ^= value >>> 16;
   value = Math.imul(value, 2246822507) >>> 0;
   value ^= value >>> 13;
   return (value >>> 0) / 4294967296;
 };
 
-const pick = (items, seed, index, salt) =>
-  items[Math.floor(random(seed, index, salt) * items.length)];
+const pick = (items, seedHashValue, index, salt) =>
+  items[Math.floor(random(seedHashValue, index, salt) * items.length)];
 
 const tokenAt = (items, index, base, offset) => {
   let value = Math.floor(index / offset);
@@ -24,35 +36,45 @@ const tokenAt = (items, index, base, offset) => {
 
 const roundCurrency = (value) => Math.round(value * 100) / 100;
 
-const ratingFor = (seed, index, reviewCount) => {
+const ratingFor = (seedHashValue, index, reviewCount) => {
   if (reviewCount === 0) return null;
-  const raw = 3.2 + random(seed, index, 11) * 1.8;
+  const raw = 3.2 + random(seedHashValue, index, 11) * 1.8;
   return Math.min(5, Math.round(raw * 10) / 10);
 };
 
 export const createProduct = (index, seed) => {
-  const category = catalog[Math.floor(random(seed, index, 1) * catalog.length)];
+  const seedHashValue = seedHash(seed);
+  const category = catalog[
+    Math.floor(random(seedHashValue, index, 1) * catalog.length)
+  ];
   const [minimumPrice, maximumPrice] = category.priceRange;
   const price = roundCurrency(
-    minimumPrice + random(seed, index, 2) * (maximumPrice - minimumPrice),
+    minimumPrice +
+      random(seedHashValue, index, 2) * (maximumPrice - minimumPrice),
   );
-  const discountPercentage = Math.floor(random(seed, index, 3) * 36);
+  const discountPercentage = Math.floor(random(seedHashValue, index, 3) * 36);
   const discountedPrice = roundCurrency(price * (1 - discountPercentage / 100));
-  const reviewCount = Math.floor(random(seed, index, 4) * 5000);
-  const stockQuantity = Math.floor(random(seed, index, 5) * 500);
+  const reviewCount = Math.floor(random(seedHashValue, index, 4) * 5000);
+  const stockQuantity = Math.floor(random(seedHashValue, index, 5) * 500);
+  const subcategory =
+    category.subcategories[index % category.subcategories.length];
+  const subcategoryLower = subcategory.toLowerCase();
+  const brand = tokenAt(category.brands, index, category.brands.length, 1);
+  const variantOffset =
+    category.brands.length *
+    vocabulary.descriptors.length *
+    category.families.length *
+    vocabulary.materials.length *
+    vocabulary.finishes.length;
   const variant = tokenAt(
     vocabulary.variants,
     index,
     vocabulary.variants.length,
-    category.brands.length *
-      vocabulary.descriptors.length *
-      category.families.length *
-      vocabulary.materials.length *
-      vocabulary.finishes.length,
+    variantOffset,
   );
   const name = [
     category.category,
-    tokenAt(category.brands, index, category.brands.length, 1),
+    brand,
     tokenAt(
       vocabulary.descriptors,
       index,
@@ -95,15 +117,13 @@ export const createProduct = (index, seed) => {
   ].join(" ");
   const tags = [
     category.category,
-    category.subcategories[index % category.subcategories.length]
-      .toLowerCase()
-      .replaceAll(" ", "-"),
+    subcategoryLower.replaceAll(" ", "-"),
     variant.toLowerCase(),
   ];
   const attributes = Object.fromEntries(
     category.attributeNames.map((name, attributeIndex) => [
       name,
-      `${pick(vocabulary.materials, seed, index, 20 + attributeIndex)} ${pick(vocabulary.finishes, seed, index, 30 + attributeIndex)}`,
+      `${pick(vocabulary.materials, seedHashValue, index, 20 + attributeIndex)} ${pick(vocabulary.finishes, seedHashValue, index, 30 + attributeIndex)}`,
     ]),
   );
   const availability =
@@ -116,17 +136,17 @@ export const createProduct = (index, seed) => {
   return {
     name,
     sku: `PC-${index.toString(36).padStart(8, "0")}`,
-    brand: tokenAt(category.brands, index, category.brands.length, 1),
+    brand,
     category: category.category,
-    subcategory: category.subcategories[index % category.subcategories.length],
-    description: `${name} is designed for dependable ${category.subcategories[index % category.subcategories.length].toLowerCase()} use, with a ${pick(vocabulary.finishes, seed, index, 40).toLowerCase()} finish and a practical ${variant.toLowerCase()} profile.`,
+    subcategory,
+    description: `${name} is designed for dependable ${subcategoryLower} use, with a ${pick(vocabulary.finishes, seedHashValue, index, 40).toLowerCase()} finish and a practical ${variant.toLowerCase()} profile.`,
     price,
     discountPercentage,
     discountedPrice,
     imageUrls: [
       `https://images.example.com/products/${index.toString(36)}-1.webp`,
     ],
-    averageRating: ratingFor(seed, index, reviewCount),
+    averageRating: ratingFor(seedHashValue, index, reviewCount),
     ratingCount: reviewCount,
     reviewCount,
     stockQuantity,
@@ -137,10 +157,10 @@ export const createProduct = (index, seed) => {
       Math.round(
         (reviewCount * 0.6 +
           stockQuantity * 0.2 +
-          random(seed, index, 50) * 1000) *
+          random(seedHashValue, index, 50) * 1000) *
           100,
       ) / 100,
-    salesCount: Math.floor(random(seed, index, 51) * 50000),
+    salesCount: Math.floor(random(seedHashValue, index, 51) * 50000),
     createdAt: new Date(
       Date.UTC(2022 + (index % 4), index % 12, (index % 27) + 1),
     ),

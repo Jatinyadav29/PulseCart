@@ -2,15 +2,26 @@ import mongoose from "mongoose";
 
 const refreshTokenSchema = new mongoose.Schema(
   {
-    jti: { type: String, required: true, unique: true, index: true },
+    jti: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
-    tokenHash: { type: String, required: true },
-    expiresAt: { type: Date, required: true },
+    tokenHash: {
+      type: String,
+      required: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
   },
   { timestamps: true },
 );
