@@ -4,7 +4,12 @@
   "description": "",
   "main": "./src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:performance": "vitest run tests/performance --passWithNoTests",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "start": "node ./src/server.js",
     "dev": "nodemon ./src/server.js",
     "seed:products": "node ./scripts/seed/seed-products.js",
@@ -30,6 +35,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@vitest/coverage-v8": "^3.2.7",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.3.1",
+    "vitest": "^3.2.7"
   }
 }
